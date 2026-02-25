@@ -3,17 +3,13 @@ from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, No
 
 logger = logging.getLogger(__name__)
 
-def fetch_transcript(video_id: str) -> str:
+def fetch_transcript_segments(video_id: str) -> list[dict]:
     """
-    Fetches the transcript for a given YouTube video ID.
-    Returns the transcript as a single string.
-    Raises Exception with a user-friendly message on failure.
+    Fetches the transcript segments for a given YouTube video ID.
+    Returns a list of dicts: [{'text': str, 'start': float, 'duration': float}, ...]
     """
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-        # Concatenate all text parts
-        transcript_text = " ".join([item['text'] for item in transcript_list])
-        return transcript_text
+        return YouTubeTranscriptApi.get_transcript(video_id)
     except TranscriptsDisabled:
         raise Exception("Transcripts are disabled for this video.")
     except NoTranscriptFound:
@@ -21,3 +17,11 @@ def fetch_transcript(video_id: str) -> str:
     except Exception as e:
         logger.error(f"Error fetching transcript for {video_id}: {str(e)}")
         raise Exception(f"Failed to fetch transcript: {str(e)}")
+
+def fetch_transcript(video_id: str) -> str:
+    """
+    Fetches the transcript for a given YouTube video ID as a single string.
+    """
+    segments = fetch_transcript_segments(video_id)
+    return " ".join([item['text'] for item in segments])
+
