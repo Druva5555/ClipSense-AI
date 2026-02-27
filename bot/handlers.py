@@ -7,6 +7,8 @@ from services.transcript_service import fetch_transcript_segments
 from services.chunking_service import chunk_transcript
 from services.summarizer import generate_summary
 from services.qa_engine import answer_question
+from services.language_service import detect_language
+from storage.session_store import session_store
 
 logger = logging.getLogger(__name__)
 
@@ -19,59 +21,69 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Detect YouTube URL for summarization OR handle questions for Q&A."""
+    """Detect YouTube URL for summarization OR handle questions for Q&A with multilingual support."""
     text = update.message.text
     if not text:
         return
 
     video_id = extract_youtube_id(text)
+    user_id = update.effective_user.id
     
     # 1. Handle YouTube URL (Summarization)
     if video_id:
+        target_language = detect_language(text)
+        
         status_message = await update.message.reply_text(
-            f"Valid YouTube link detected! (ID: {video_id})\nFetching transcript..."
+            f"Valid YouTube link detected! (ID: {video_id})\n"
+            f"Fetching transcript and summarizing in {target_language}..."
         )
         
         try:
             segments = fetch_transcript_segments(video_id)
             chunks = chunk_transcript(segments)
             
-            # Store chunks in session store for Q&A
-            user_id = update.effective_user.id
-            session_store.set_session(user_id, video_id, chunks)
+            # Store chunks and detected language in session
+            session_store.set_session(user_id, video_id, chunks, language=target_language)
             
             if len(chunks) > 1:
                 await status_message.edit_text(
-                    f"Transcript fetched! Splitting into {len(chunks)} parts for processing...\n"
-                    "Generating comprehensive summary..."
+                    f"Transcript fetched! Processing {len(chunks)} parts...\n"
+                    f"Generating {target_language} summary..."
                 )
             else:
                 await status_message.edit_text("Transcript fetched! Generating summary...")
             
-            summary = generate_summary(chunks)
+            summary = generate_summary(chunks, language=target_language)
             await status_message.edit_text(summary)
-            await update.message.reply_text("You can now ask me follow-up questions about this video!")
+            await update.message.reply_text(f"You can now ask me follow-up questions in any language (Default: {target_language})!")
             
         except Exception as e:
             logger.error(f"Summarization error: {str(e)}")
-            await status_message.edit_text(f"Sorry, I encountered an error during summarization: {str(e)}")
+            await status_message.edit_text(f"Error during summarization: {str(e)}")
     
     # 2. Handle non-URL text (Q&A)
     else:
-        user_id = update.effective_user.id
         session = session_store.get_session(user_id)
         
         if not session or not session.get('chunks'):
             await update.message.reply_text(
-                "I don't have a transcript in memory yet. "
-                "Please send me a YouTube link first, and then you can ask questions about it!"
+                "Please send me a YouTube link first!"
             )
             return
 
         chunks = session['chunks']
-        status_message = await update.message.reply_text("Thinking...")
+        # Check if user explicitly requested a different language in this question
+        current_language = session.get('language', 'English')
+        requested_language = detect_language(text)
+        
+        # If the user explicitly mentioned a language in the question, update session
+        if "in" in text.lower() and requested_language != "English":
+             current_language = requested_language
+             session_store.update_language(user_id, current_language)
+
+        status_message = await update.message.reply_text(f"Thinking ({current_language})...")
         try:
-            answer = answer_question(text, chunks)
+            answer = answer_question(text, chunks, language=current_language)
             await status_message.edit_text(answer)
         except Exception as e:
             logger.error(f"Q&A error: {str(e)}")

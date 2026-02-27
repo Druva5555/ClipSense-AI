@@ -10,13 +10,20 @@ class SessionStore:
     def __init__(self):
         self._sessions = {}
 
-    def set_session(self, user_id: int, video_id: str, chunks: list[str]):
-        """Stores the transcript chunks for a user session."""
+    def set_session(self, user_id: int, video_id: str, chunks: list[str], language: str = "English"):
+        """Stores the transcript chunks and language preference for a user session."""
         self._sessions[user_id] = {
             'video_id': video_id,
-            'chunks': chunks
+            'chunks': chunks,
+            'language': language
         }
-        logger.info(f"Session stored for user {user_id} (video: {video_id})")
+        logger.info(f"Session stored for user {user_id} (video: {video_id}, language: {language})")
+
+    def update_language(self, user_id: int, language: str):
+        """Updates the language preference for a user's current session."""
+        if user_id in self._sessions:
+            self._sessions[user_id]['language'] = language
+            logger.info(f"Language updated for user {user_id} to {language}")
 
     def get_session(self, user_id: int) -> dict | None:
         """Retrieves the current session for a user."""
