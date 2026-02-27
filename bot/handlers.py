@@ -36,9 +36,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             segments = fetch_transcript_segments(video_id)
             chunks = chunk_transcript(segments)
             
-            # Store chunks in user session for Q&A
-            context.user_data['last_transcript_chunks'] = chunks
-            context.user_data['last_video_id'] = video_id
+            # Store chunks in session store for Q&A
+            user_id = update.effective_user.id
+            session_store.set_session(user_id, video_id, chunks)
             
             if len(chunks) > 1:
                 await status_message.edit_text(
@@ -58,14 +58,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 2. Handle non-URL text (Q&A)
     else:
-        chunks = context.user_data.get('last_transcript_chunks')
-        if not chunks:
+        user_id = update.effective_user.id
+        session = session_store.get_session(user_id)
+        
+        if not session or not session.get('chunks'):
             await update.message.reply_text(
                 "I don't have a transcript in memory yet. "
                 "Please send me a YouTube link first, and then you can ask questions about it!"
             )
             return
 
+        chunks = session['chunks']
         status_message = await update.message.reply_text("Thinking...")
         try:
             answer = answer_question(text, chunks)
@@ -73,6 +76,3 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Q&A error: {str(e)}")
             await status_message.edit_text(f"Sorry, I couldn't answer that: {str(e)}")
-
-
-
