@@ -34,11 +34,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_language = detect_language(text)
         
         status_message = await update.message.reply_text(
-            f"Valid YouTube link detected! (ID: {video_id})\n"
-            f"Fetching transcript and summarizing in {target_language}..."
+            f"🔍 Valid YouTube link detected!\n"
+            f"⏳ Fetching transcript and preparing {target_language} summary..."
         )
         
         try:
+            # Show typing indicator for long operations
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+            
             segments = fetch_transcript_segments(video_id)
             chunks = chunk_transcript(segments)
             
@@ -47,19 +50,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if len(chunks) > 1:
                 await status_message.edit_text(
-                    f"Transcript fetched! Processing {len(chunks)} parts...\n"
-                    f"Generating {target_language} summary..."
+                    f"✅ Transcript fetched! This is a long video, processing {len(chunks)} parts...\n"
+                    f"✍️ Generating {target_language} summary. This might take a moment..."
                 )
             else:
-                await status_message.edit_text("Transcript fetched! Generating summary...")
+                await status_message.edit_text(f"✅ Transcript fetched!\n✍️ Generating {target_language} summary...")
             
+            # Keep typing indicator alive for long summaries
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
             summary = generate_summary(chunks, language=target_language)
+            
             await status_message.edit_text(summary)
-            await update.message.reply_text(f"You can now ask me follow-up questions in any language (Default: {target_language})!")
+            await update.message.reply_text(f"✨ You can now ask me follow-up questions in any language (Default: {target_language})!")
             
         except Exception as e:
-            logger.error(f"Summarization error: {str(e)}")
-            await status_message.edit_text(f"Error during summarization: {str(e)}")
+            error_text = str(e)
+            logger.error(f"Summarization error: {error_text}")
+            await status_message.edit_text(f"❌ {error_text}")
     
     # 2. Handle non-URL text (Q&A)
     else:
@@ -67,7 +74,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if not session or not session.get('chunks'):
             await update.message.reply_text(
-                "Please send me a YouTube link first!"
+                "👋 I don't have a video in memory yet!\n"
+                "Please send me a YouTube link first, and then I can help you with questions."
             )
             return
 
@@ -81,10 +89,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
              current_language = requested_language
              session_store.update_language(user_id, current_language)
 
-        status_message = await update.message.reply_text(f"Thinking ({current_language})...")
+        status_message = await update.message.reply_text(f"🤔 Thinking ({current_language})...")
         try:
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
             answer = answer_question(text, chunks, language=current_language)
             await status_message.edit_text(answer)
         except Exception as e:
-            logger.error(f"Q&A error: {str(e)}")
-            await status_message.edit_text(f"Sorry, I couldn't answer that: {str(e)}")
+            error_text = str(e)
+            logger.error(f"Q&A error: {error_text}")
+            await status_message.edit_text(f"⚠️ {error_text}")

@@ -47,6 +47,8 @@ def _generate_single_summary(text: str, language: str) -> str:
 
     except Exception as e:
         logger.error(f"Error in _generate_single_summary: {str(e)}")
+        if "rate_limit_exceeded" in str(e).lower():
+            raise Exception("The bot is currently experiencing high demand (Rate Limit). Please try again in a few minutes.")
         raise e
 
 def _summarize_multiple_chunks(chunks: list[str], language: str) -> str:

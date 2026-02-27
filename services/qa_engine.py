@@ -43,4 +43,6 @@ def answer_question(question: str, chunks: list[str], language: str = "English")
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error in answer_question: {str(e)}")
+        if "rate_limit_exceeded" in str(e).lower():
+             raise Exception("The bot is currently experiencing high demand (Rate Limit). Please try again in a few minutes.")
         raise Exception(f"Failed to generate answer: {str(e)}")
