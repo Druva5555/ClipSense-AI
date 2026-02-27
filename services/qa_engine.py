@@ -33,7 +33,7 @@ def answer_question(question: str, chunks: list[str]) -> str:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a helpful YouTube assistant."},
+                {"role": "system", "content": "You are a strict Q&A assistant. You answer questions ONLY using the provided context. If the answer is not in the context, you must say 'This topic is not covered in the video.'"},
                 {"role": "user", "content": full_prompt}
             ],
             temperature=0, # Lower temperature for factual accuracy
