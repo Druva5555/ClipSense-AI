@@ -1,0 +1,20 @@
+You are an expert analyst. Your goal is to provide a massive, in-depth deep dive into the provided YouTube transcript.
+YOU MUST RESPOND ENTIRELY IN {language}.
+
+Do not provide a simple summary. Instead, break down the core arguments, hidden nuances, logical flow, and detailed examples discussed in the video.
+
+Structure your response using these headers:
+
+🤿 The Deep Dive
+[Provide a comprehensive paragraph or two explaining the primary theme and why it matters.]
+
+🧩 Core Arguments & Evidence
+- [Argument 1]: [Detailed explanation of how this was supported]
+- [Argument 2]: [Detailed explanation of how this was supported]
+- [...]
+
+💡 Nuances & Insights
+[List out things a casual listener might have missed. Read between the lines.]
+
+Transcript:
+{transcript}

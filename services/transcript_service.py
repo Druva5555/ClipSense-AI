@@ -1,3 +1,4 @@
+import logging
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from storage.cache import transcript_cache
 
@@ -15,7 +16,17 @@ def fetch_transcript_segments(video_id: str) -> list[dict]:
         return cached_segments
 
     try:
-        segments = YouTubeTranscriptApi.get_transcript(video_id)
+        api = YouTubeTranscriptApi()
+        transcript_list = api.list(video_id)
+        # Try to find English or Telugu, otherwise grab whatever is available
+        try:
+            transcript = transcript_list.find_transcript(['en', 'te'])
+        except Exception:
+            # Fallback to the first generated or manually created transcript
+            transcript = next(iter(transcript_list))
+        
+        segments = transcript.fetch().to_raw_data()
+        
         # Store in cache
         transcript_cache.set_transcript(video_id, segments)
         return segments

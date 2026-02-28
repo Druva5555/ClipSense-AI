@@ -20,8 +20,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "\n\nHere is what I can do:"
         "\n🎥 <b>Summarize</b>: Send me a YouTube link (or use /summary <url>)."
         "\n❓ <b>Ask</b>: Ask me questions about the video (or use /ask <question>)."
+        "\n🤿 <b>Deep Dive</b>: Get a detailed breakdown of the video (use /deepdive)."
+        "\n🎯 <b>Action Points</b>: Extract a to-do list from the video (use /actionpoints)."
         "\n🌐 <b>Language</b>: Use /language <lang> to set your preferred language."
     )
+
+async def _process_analysis_command(update: Update, context: ContextTypes.DEFAULT_TYPE, prompt_file: str, action_name: str, emoji: str):
+    """Generic handler for /deepdive and /actionpoints commands."""
+    user_id = update.effective_user.id
+    session = session_store.get_session(user_id)
+    
+    if not session or not session.get('chunks'):
+        await update.message.reply_text(
+            "👋 I don't have a video in memory yet!\n"
+            "Please send me a YouTube link first, and then I can run this command."
+        )
+        return
+
+    chunks = session['chunks']
+    video_id = session.get('video_id')
+    current_language = session.get('language', 'English')
+    
+    status_message = await update.message.reply_text(f"{emoji} Generating {action_name} in {current_language}... This might take a moment.")
+    
+    try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        result = generate_summary(chunks, language=current_language, prompt_file=prompt_file, video_id=video_id)
+        await status_message.edit_text(result)
+    except Exception as e:
+        error_text = str(e)
+        logger.error(f"{action_name} error: {error_text}")
+        await status_message.edit_text(f"❌ {error_text}")
+
+async def command_deepdive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /deepdive command."""
+    await _process_analysis_command(update, context, "prompts/deepdive_prompt.txt", "Deep Dive", "🤿")
+
+async def command_actionpoints(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /actionpoints command."""
+    await _process_analysis_command(update, context, "prompts/actionpoints_prompt.txt", "Action Points", "🎯")
 
 async def command_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /summary command."""
@@ -104,7 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Keep typing indicator alive for long summaries
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-            summary = generate_summary(chunks, language=target_language)
+            summary = generate_summary(chunks, language=target_language, video_id=video_id)
             
             await status_message.edit_text(summary)
             await update.message.reply_text(f"✨ You can now ask me follow-up questions in any language (Default: {target_language})!")
@@ -138,7 +175,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_message = await update.message.reply_text(f"🤔 Thinking ({current_language})...")
         try:
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-            answer = answer_question(text, chunks, language=current_language)
+            
+            video_id = session.get('video_id')
+            answer = answer_question(text, chunks, language=current_language, video_id=video_id)
+            
             await status_message.edit_text(answer)
         except Exception as e:
             error_text = str(e)
