@@ -16,9 +16,55 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     user = update.effective_user
     await update.message.reply_html(
-        rf"Hi {user.mention_html()}! I'm your YouTube Summarizer Bot. "
-        "Send me a YouTube link to summarize it, or ask me questions about the last video we processed!"
+        rf"👋 Hi {user.mention_html()}! I'm your YouTube Summarizer Bot. "
+        "\n\nHere is what I can do:"
+        "\n🎥 <b>Summarize</b>: Send me a YouTube link (or use /summary <url>)."
+        "\n❓ <b>Ask</b>: Ask me questions about the video (or use /ask <question>)."
+        "\n🌐 <b>Language</b>: Use /language <lang> to set your preferred language."
     )
+
+async def command_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /summary command."""
+    if not context.args:
+        await update.message.reply_text("⚠️ Usage: /summary <youtube_url>")
+        return
+    
+    # Re-use the existing text handling logic by simulating a text message
+    update.message.text = context.args[0]
+    await handle_message(update, context)
+
+async def command_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /ask command."""
+    if not context.args:
+        await update.message.reply_text("⚠️ Usage: /ask <your question>")
+        return
+    
+    # Re-use the existing text handling logic
+    update.message.text = " ".join(context.args)
+    await handle_message(update, context)
+
+async def command_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /language command."""
+    if not context.args:
+        await update.message.reply_text("⚠️ Usage: /language <English|Telugu>")
+        return
+    
+    new_language = context.args[0].capitalize()
+    user_id = update.effective_user.id
+    
+    if new_language not in ["English", "Telugu"]:
+        await update.message.reply_text("❌ Currently, I only support English and Telugu.")
+        return
+
+    session = session_store.get_session(user_id)
+    if session:
+        session_store.update_language(user_id, new_language)
+        await update.message.reply_text(f"🌐 Language updated to {new_language} for this session.")
+    else:
+        # Create an empty session just to store the language preference
+        session_store.set_session(user_id, "", [], language=new_language)
+        await update.message.reply_text(f"🌐 Language preference set to {new_language}. Send me a video!")
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Detect YouTube URL for summarization OR handle questions for Q&A with multilingual support."""
